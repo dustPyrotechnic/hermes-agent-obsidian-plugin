@@ -33,6 +33,24 @@ export function deriveTitle(messages: StoredMessage[]): string {
   return raw.length > 60 ? raw.slice(0, 57) + "..." : raw;
 }
 
+/**
+ * A one-line preview of where the conversation left off, role-prefixed.
+ *
+ * The row title is derived from the FIRST user message, so a long multi-turn
+ * chat looked identical to a single unanswered query. This surfaces the last
+ * turn so the row reads as a conversation rather than one stray question.
+ * Returns "" when there is nothing beyond the opening message to preview.
+ */
+export function lastMessagePreview(messages: StoredMessage[], max = 80): string {
+  const visible = messages.filter((m) => m.role !== "system" && m.content.trim());
+  if (visible.length < 2) return "";
+  const last = visible[visible.length - 1];
+  const who = last.role === "user" ? "You" : "Hermes";
+  const raw = last.content.replace(/\s+/g, " ").trim();
+  const body = raw.length > max ? raw.slice(0, max - 3) + "..." : raw;
+  return `${who}: ${body}`;
+}
+
 /** A compact label for a chat tab (ASCII-only ellipsis per project rules). */
 export function tabLabel(title: string): string {
   const t = (title || "").trim();

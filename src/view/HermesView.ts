@@ -8,7 +8,7 @@ import type HermesPlugin from "../main";
 import { ChatHandle, ChatMessage, HermesGatewayClient, ToolEvent, UsageInfo } from "../runtime/gatewayClient";
 import { resolveWorkingFolder } from "../runtime/context";
 import { contextPercent, contextWindowFor, greetingOptions, humanizeModel } from "../runtime/protocol";
-import { Conversation, deriveTitle, relativeTime, tabLabel } from "../runtime/history";
+import { Conversation, deriveTitle, lastMessagePreview, relativeTime, tabLabel } from "../runtime/history";
 
 export const VIEW_TYPE_HERMES = "hermes-chat";
 
@@ -739,6 +739,8 @@ class HistoryModal extends Modal {
         const row = listEl.createDiv({ cls: "hermes-history-row" });
         const main = row.createDiv({ cls: "hermes-history-main" });
         main.createDiv({ cls: "hermes-history-title", text: conv.title });
+        const preview = lastMessagePreview(conv.messages);
+        if (preview) main.createDiv({ cls: "hermes-history-preview", text: preview });
         main.createDiv({
           cls: "hermes-history-meta",
           text: `${relativeTime(now, conv.updatedAt)} - ${conv.messages.length} messages`

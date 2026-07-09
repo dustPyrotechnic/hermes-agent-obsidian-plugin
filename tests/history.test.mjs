@@ -7,6 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   deriveTitle,
+  lastMessagePreview,
   tabLabel,
   upsertConversation,
   removeConversation,
@@ -37,6 +38,46 @@ test("deriveTitle truncates long titles to 60 chars with an ellipsis", () => {
 test("deriveTitle falls back to 'New chat' when there is no user text", () => {
   assert.equal(deriveTitle([]), "New chat");
   assert.equal(deriveTitle([{ role: "assistant", content: "only assistant" }]), "New chat");
+});
+
+test("lastMessagePreview returns '' when there is nothing beyond the opening message", () => {
+  assert.equal(lastMessagePreview([]), "");
+  assert.equal(lastMessagePreview([{ role: "user", content: "only one" }]), "");
+});
+
+test("lastMessagePreview role-prefixes and collapses the final turn", () => {
+  assert.equal(
+    lastMessagePreview([
+      { role: "user", content: "first query" },
+      { role: "assistant", content: "  the   answer \n is here " }
+    ]),
+    "Hermes: the answer is here"
+  );
+  assert.equal(
+    lastMessagePreview([
+      { role: "user", content: "first query" },
+      { role: "assistant", content: "answer" },
+      { role: "user", content: "follow up" }
+    ]),
+    "You: follow up"
+  );
+});
+
+test("lastMessagePreview truncates to max and ignores system/empty messages", () => {
+  const long = "x".repeat(200);
+  const out = lastMessagePreview([{ role: "user", content: "q" }, { role: "assistant", content: long }], 20);
+  assert.equal(out, `Hermes: ${"x".repeat(17)}...`);
+  assert.equal(out.length, "Hermes: ".length + 20);
+
+  // A trailing system message must not become the preview.
+  assert.equal(
+    lastMessagePreview([
+      { role: "user", content: "q" },
+      { role: "assistant", content: "a" },
+      { role: "system", content: "context blob" }
+    ]),
+    "Hermes: a"
+  );
 });
 
 test("tabLabel shortens long titles and keeps short ones", () => {
