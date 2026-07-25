@@ -130,6 +130,9 @@ export class HermesView extends ItemView {
         void this.onSend();
       }
     });
+    // Typing counts as "still using" a pending selection snapshot — keeps
+    // its 5s expiry from firing mid-compose (see touchSelectionActivity).
+    this.inputEl.addEventListener("input", () => this.plugin.touchSelectionActivity());
     const inputActions = inputWrap.createDiv({ cls: "hermes-input-actions" });
 
     // Meta bar (model | thinking | tokens | working folder), like Claudian's footer.
@@ -471,13 +474,21 @@ export class HermesView extends ItemView {
     const mdView = this.plugin.getActiveMarkdownView();
     if (mdView) {
       notePath = mdView.file?.path;
-      if (this.includeSelectionToggle.checked) {
-        const sel = mdView.editor.getSelection();
-        if (sel) selection = sel;
-      }
       if (this.includeNoteToggle.checked) {
         noteContent = this.plugin.settings.includeNoteContent ? mdView.editor.getValue() : undefined;
         if (!notePath) notePath = mdView.file?.path;
+      }
+    }
+
+    // Read via the plugin's snapshot-aware getter, not mdView.editor.getSelection()
+    // directly: by the time Send is clicked, focus has already moved into this
+    // chat input, and a live read at that point is not reliable across all
+    // editor/theme combinations (see getCurrentSelection's doc comment).
+    if (this.includeSelectionToggle.checked) {
+      const sel = this.plugin.getCurrentSelection();
+      if (sel) {
+        selection = sel.text;
+        if (!notePath) notePath = sel.notePath;
       }
     }
 

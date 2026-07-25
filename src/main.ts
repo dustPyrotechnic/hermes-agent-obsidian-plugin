@@ -1,4 +1,4 @@
-import { Editor, FileSystemAdapter, MarkdownView, Notice, Plugin, WorkspaceLeaf, normalizePath } from "obsidian";
+import { FileSystemAdapter, MarkdownView, Notice, Plugin, WorkspaceLeaf, normalizePath } from "obsidian";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -25,6 +25,34 @@ export default class HermesPlugin extends Plugin {
   /** Locally persisted chat history (newest first), loaded from history.json. */
   conversations: Conversation[] = [];
 
+  /**
+   * Last Markdown view that was actually focused, tracked via
+   * `active-leaf-change`. `getActiveViewOfType(MarkdownView)` alone returns
+   * null once focus moves into the Hermes sidebar (e.g. clicking the chat
+   * input), which silently dropped the "current note" attachment even when
+   * the toggle was checked. This cache is the fallback for that case.
+   */
+  private lastMarkdownView: MarkdownView | null = null;
+
+  /**
+   * Snapshot of the last non-empty selection seen in `lastMarkdownView`.
+   * Updated continuously (see the `selectionchange` listener in `onload`)
+   * rather than only at the moment focus leaves the editor — waiting for a
+   * single focus-change event turned out to still race with editor/theme
+   * combinations that collapse the visual selection right around the same
+   * moment. A live, always-up-to-date snapshot sidesteps that timing
+   * entirely: by the time the user clicks Send, the value is already
+   * sitting here from whenever they last had something selected.
+   *
+   * Expires 5s after the last relevant activity (a new selection, or typing
+   * in the chat input — see `touchSelectionActivity`) so a selection you
+   * made and then walked away from doesn't silently get attached to some
+   * unrelated message sent much later. Set only via `setSelectionSnapshot`.
+   */
+  private lastSelectionSnapshot: { notePath?: string; text: string } | null = null;
+  private selectionExpiryTimer: number | null = null;
+  private static readonly SELECTION_EXPIRY_MS = 5000;
+
   async onload(): Promise<void> {
     await this.loadSettings();
     await this.loadHistory();
@@ -35,6 +63,30 @@ export default class HermesPlugin extends Plugin {
 
     this.registerView(VIEW_TYPE_HERMES, (leaf) => new HermesView(leaf, this));
     this.registerView(VIEW_TYPE_HERMES_GRAPH, (leaf) => new HermesGraphView(leaf, this));
+
+    this.lastMarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        if (this.lastMarkdownView) {
+          const sel = this.captureViewSelection(this.lastMarkdownView);
+          if (sel) this.setSelectionSnapshot({ notePath: this.lastMarkdownView.file?.path, text: sel });
+        }
+        const view = leaf?.view;
+        if (view instanceof MarkdownView) this.lastMarkdownView = view;
+      })
+    );
+
+    // Primary capture mechanism: fires on every selection change anywhere in
+    // the document (mouse drag, shift+arrow, double-click-to-select, ...).
+    // Only stores it when the selection actually lands inside the tracked
+    // Markdown view, so selecting/copying text elsewhere (e.g. the Hermes
+    // chat log itself) never overwrites a genuine note selection.
+    this.registerDomEvent(activeDocument, "selectionchange", () => {
+      const view = this.lastMarkdownView;
+      if (!view) return;
+      const sel = this.captureViewSelection(view);
+      if (sel) this.setSelectionSnapshot({ notePath: view.file?.path, text: sel });
+    });
 
     this.addRibbonIcon("bot", "Open Hermes Agent", () => {
       void this.activateView();
@@ -88,10 +140,16 @@ export default class HermesPlugin extends Plugin {
     this.addCommand({
       id: "send-selection",
       name: "Send selection to Hermes",
-      editorCheckCallback: (checking, editor: Editor, ctx) => {
-        const sel = editor.getSelection();
+      // Not editorCheckCallback: that only sees the CodeMirror selection,
+      // which stays empty for text highlighted by dragging over Reading
+      // View (rendered HTML, not the editor). captureViewSelection covers
+      // both modes.
+      checkCallback: (checking) => {
+        const mdView = this.getActiveMarkdownView();
+        if (!mdView) return false;
+        const sel = this.captureViewSelection(mdView);
         if (!sel) return false;
-        if (!checking) void this.sendSelection(editor, ctx as MarkdownView);
+        if (!checking) void this.sendSelection(mdView, sel);
         return true;
       }
     });
@@ -101,6 +159,7 @@ export default class HermesPlugin extends Plugin {
 
   onunload(): void {
     // Obsidian detaches leaves automatically; HermesView.onClose aborts streams.
+    if (this.selectionExpiryTimer !== null) window.clearTimeout(this.selectionExpiryTimer);
   }
 
   async loadSettings(): Promise<void> {
@@ -154,9 +213,100 @@ export default class HermesPlugin extends Plugin {
     await this.persistHistory();
   }
 
-  /** Get the active markdown editor view, if any. */
+  /**
+   * Get the active markdown editor view, if any. Falls back to the last
+   * Markdown view that had focus before it (e.g. before the user clicked
+   * into the Hermes sidebar chat input), as long as that view's leaf is
+   * still open in the workspace.
+   */
   getActiveMarkdownView(): MarkdownView | null {
-    return this.app.workspace.getActiveViewOfType(MarkdownView);
+    const active = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (active) return active;
+
+    const fallback = this.lastMarkdownView;
+    if (fallback && this.app.workspace.getLeavesOfType("markdown").some((leaf) => leaf.view === fallback)) {
+      return fallback;
+    }
+    return null;
+  }
+
+  /**
+   * The editor selection to attach to a chat turn: a live read if a
+   * Markdown view is genuinely focused right now, otherwise the snapshot
+   * captured at the moment focus last left an editor (see
+   * `lastSelectionSnapshot`). Prefer this over calling
+   * `editor.getSelection()` directly from the chat panel — by the time the
+   * user has clicked into the sidebar and pressed Send, the live read is
+   * not reliable across all editor/theme combinations.
+   */
+  getCurrentSelection(): { notePath?: string; text: string } | null {
+    const active = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (active) {
+      const sel = this.captureViewSelection(active);
+      if (sel) return { notePath: active.file?.path, text: sel };
+    }
+    return this.lastSelectionSnapshot;
+  }
+
+  /** Store a selection snapshot and (re)start its 5s expiry countdown. */
+  private setSelectionSnapshot(snap: { notePath?: string; text: string }): void {
+    this.lastSelectionSnapshot = snap;
+    this.scheduleSelectionExpiry();
+  }
+
+  private scheduleSelectionExpiry(): void {
+    if (this.selectionExpiryTimer !== null) window.clearTimeout(this.selectionExpiryTimer);
+    this.selectionExpiryTimer = window.setTimeout(() => {
+      this.lastSelectionSnapshot = null;
+      this.selectionExpiryTimer = null;
+    }, HermesPlugin.SELECTION_EXPIRY_MS);
+  }
+
+  /**
+   * Extend the selection's expiry window in response to activity that
+   * signals the user still means to use it — e.g. typing a message in the
+   * chat panel after selecting some text. Without this, composing a
+   * message that takes longer than 5s would let the selection expire out
+   * from under the user right before they hit Send.
+   */
+  touchSelectionActivity(): void {
+    if (this.lastSelectionSnapshot) this.scheduleSelectionExpiry();
+  }
+
+  /**
+   * Read the currently highlighted text in a Markdown view, covering BOTH
+   * editing modes:
+   *  - Reading View: the note is rendered HTML, not a CodeMirror instance —
+   *    `editor.getSelection()` only ever reflects the underlying source
+   *    buffer's cursor/selection state, which mouse-dragging over rendered
+   *    HTML never touches. So a plain-text selection made while reading a
+   *    note was previously always silently dropped.
+   *  - Source / Live Preview: a genuine CodeMirror selection, read via the
+   *    Editor API as before.
+   * Native `window.getSelection()` is tried first since it covers Reading
+   * View (and also works in Live Preview, which renders real DOM text) —
+   * but only if the selection actually lands inside this view's container,
+   * so a selection the user made somewhere else (e.g. highlighting text in
+   * the Hermes chat log itself) isn't mistaken for "the note".
+   */
+  private captureViewSelection(view: MarkdownView): string {
+    try {
+      const domSel = window.getSelection();
+      if (domSel && !domSel.isCollapsed && domSel.rangeCount > 0) {
+        const range = domSel.getRangeAt(0);
+        if (view.containerEl.contains(range.commonAncestorContainer)) {
+          const text = domSel.toString();
+          if (text.trim()) return text;
+        }
+      }
+    } catch {
+      /* window.getSelection() is always available on desktop, but stay defensive */
+    }
+    try {
+      return view.editor.getSelection();
+    } catch {
+      return "";
+    }
   }
 
   /**
@@ -309,15 +459,14 @@ export default class HermesPlugin extends Plugin {
     view.submitPrompt(prompt);
   }
 
-  private async sendSelection(editor: Editor, mdView: MarkdownView | null): Promise<void> {
-    const selection = editor.getSelection();
+  private async sendSelection(mdView: MarkdownView, selection: string): Promise<void> {
     if (!selection) {
       new Notice("Hermes: no text selected.");
       return;
     }
     const view = await this.activateView();
     if (!view) return;
-    const notePath = mdView?.file?.path;
+    const notePath = mdView.file?.path;
     const prompt = buildPrompt("Please review the selected text.", { notePath, selection });
     view.submitPrompt(prompt);
   }
