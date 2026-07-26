@@ -14,6 +14,7 @@ import {
   runCompletedUsage,
   normaliseBaseUrl,
   chatDeltaContent,
+  chatCompletionUsage,
   humanizeModel,
   contextWindowFor,
   contextPercent,
@@ -113,6 +114,18 @@ test("chatDeltaContent extracts OpenAI delta", () => {
   assert.equal(chatDeltaContent({ choices: [{ delta: { content: "hello" } }] }), "hello");
   assert.equal(chatDeltaContent({ choices: [{ delta: {} }] }), "");
   assert.equal(chatDeltaContent({}), "");
+});
+
+test("chatCompletionUsage extracts OpenAI-shaped usage (prompt/completion, not input/output)", () => {
+  assert.deepEqual(
+    chatCompletionUsage({
+      choices: [],
+      usage: { prompt_tokens: 42, completion_tokens: 8, total_tokens: 50 }
+    }),
+    { promptTokens: 42, completionTokens: 8, totalTokens: 50 }
+  );
+  assert.equal(chatCompletionUsage({ choices: [{ delta: { content: "hi" } }] }), null);
+  assert.equal(chatCompletionUsage({}), null);
 });
 
 test("humanizeModel strips provider prefix and base-url suffix", () => {

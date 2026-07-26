@@ -24,6 +24,7 @@ import {
   HermesCapabilities,
   ToolEvent,
   UsageInfo,
+  chatCompletionUsage,
   chatDeltaContent,
   contextWindowFor,
   normaliseBaseUrl,
@@ -351,7 +352,12 @@ export class HermesGatewayClient {
     const bodyObj: Record<string, unknown> = {
       model: s.model || "hermes-agent",
       messages,
-      stream: true
+      stream: true,
+      // Without this, OpenAI-compatible streams omit `usage` entirely, so
+      // the chat panel's context-window gauge never updates on this
+      // transport (it only ever moved on the Runs transport, which reports
+      // usage unconditionally via run.completed).
+      stream_options: { include_usage: true }
     };
     if (resumeSessionId) bodyObj.session_id = resumeSessionId;
     if (s.reasoningEffort) bodyObj.reasoning_effort = s.reasoningEffort;
@@ -381,6 +387,8 @@ export class HermesGatewayClient {
           hasContent = true;
           cb.onChunk(delta);
         }
+        const usage = chatCompletionUsage(json);
+        if (usage) cb.onUsage?.(usage);
         if (typeof json.error?.message === "string") lastError = json.error.message;
       } catch {
         /* skip malformed block */
