@@ -131,6 +131,137 @@
   padding: 2px 0;
 }
 
+/* Shared reading rhythm for both bubble kinds — a touch looser than the
+   default UI line-height so prose doesn't feel cramped in the sidebar. */
+.hermes-msg-content {
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+}
+
+/* ---- Markdown rendering inside assistant bubbles --------------------------
+   Obsidian's default markdown-rendered CSS is tuned for full-page reading
+   view (generous vertical rhythm, large headings). In a narrow chat bubble
+   that reads as too loose and top-heavy, so tighten spacing/sizing here
+   without touching the vault-wide reading view. */
+
+.hermes-msg-assistant .hermes-msg-content > *:first-child {
+  margin-top: 0;
+}
+
+.hermes-msg-assistant .hermes-msg-content > *:last-child {
+  margin-bottom: 0;
+}
+
+.hermes-msg-assistant .hermes-msg-content p,
+.hermes-msg-assistant .hermes-msg-content ul,
+.hermes-msg-assistant .hermes-msg-content ol,
+.hermes-msg-assistant .hermes-msg-content blockquote,
+.hermes-msg-assistant .hermes-msg-content pre,
+.hermes-msg-assistant .hermes-msg-content table,
+.hermes-msg-assistant .hermes-msg-content h1,
+.hermes-msg-assistant .hermes-msg-content h2,
+.hermes-msg-assistant .hermes-msg-content h3,
+.hermes-msg-assistant .hermes-msg-content h4,
+.hermes-msg-assistant .hermes-msg-content h5,
+.hermes-msg-assistant .hermes-msg-content h6 {
+  margin: 0.5em 0;
+}
+
+.hermes-msg-assistant .hermes-msg-content h1,
+.hermes-msg-assistant .hermes-msg-content h2,
+.hermes-msg-assistant .hermes-msg-content h3,
+.hermes-msg-assistant .hermes-msg-content h4,
+.hermes-msg-assistant .hermes-msg-content h5,
+.hermes-msg-assistant .hermes-msg-content h6 {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Full-document heading scale (up to 2em) overwhelms a chat bubble; cap it
+   to a small, flat ramp so h1..h6 stay legible but don't dominate. */
+.hermes-msg-assistant .hermes-msg-content h1 { font-size: 1.25em; }
+.hermes-msg-assistant .hermes-msg-content h2 { font-size: 1.15em; }
+.hermes-msg-assistant .hermes-msg-content h3 { font-size: 1.05em; }
+.hermes-msg-assistant .hermes-msg-content h4,
+.hermes-msg-assistant .hermes-msg-content h5,
+.hermes-msg-assistant .hermes-msg-content h6 {
+  font-size: 1em;
+}
+
+.hermes-msg-assistant .hermes-msg-content ul,
+.hermes-msg-assistant .hermes-msg-content ol {
+  padding-inline-start: 1.4em;
+}
+
+.hermes-msg-assistant .hermes-msg-content li {
+  margin: 0.15em 0;
+}
+
+.hermes-msg-assistant .hermes-msg-content li > p {
+  margin: 0;
+}
+
+.hermes-msg-assistant .hermes-msg-content code {
+  font-size: 0.85em;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+.hermes-msg-assistant .hermes-msg-content pre {
+  background: var(--background-secondary);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.hermes-msg-assistant .hermes-msg-content pre code {
+  background: transparent;
+  padding: 0;
+  white-space: pre;
+}
+
+.hermes-msg-assistant .hermes-msg-content blockquote {
+  border-left: 3px solid var(--background-modifier-border);
+  padding: 0 0.8em;
+  color: var(--text-muted);
+}
+
+.hermes-msg-assistant .hermes-msg-content a {
+  color: var(--text-accent);
+}
+
+.hermes-msg-assistant .hermes-msg-content hr {
+  margin: 0.8em 0;
+  border-color: var(--background-modifier-border);
+}
+
+.hermes-msg-assistant .hermes-msg-content img {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+/* Tables often exceed the sidebar's width; scroll horizontally inside the
+   bubble instead of blowing out the whole view. */
+.hermes-msg-assistant .hermes-msg-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.hermes-msg-assistant .hermes-msg-content th,
+.hermes-msg-assistant .hermes-msg-content td {
+  border: 1px solid var(--background-modifier-border);
+  padding: 4px 8px;
+}
+
+.hermes-msg-assistant .hermes-msg-content th {
+  background: var(--background-secondary);
+}
+
 /* Attached note/selection content on a user bubble — collapsed by default
    so a long note doesn't drown out the actual typed message. */
 .hermes-attachment {
