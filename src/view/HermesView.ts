@@ -7,10 +7,16 @@ import { App, ItemView, WorkspaceLeaf, MarkdownRenderer, Menu, Modal, setIcon, N
 import type HermesPlugin from "../main";
 import { ChatHandle, ChatMessage, HermesGatewayClient, ToolEvent, UsageInfo } from "../runtime/gatewayClient";
 import { resolveWorkingFolder } from "../runtime/context";
+import type { NoteContext } from "../runtime/context";
 import { contextPercent, contextWindowFor, greetingOptions, humanizeModel } from "../runtime/protocol";
-import { Conversation, deriveTitle, lastMessagePreview, relativeTime, tabLabel } from "../runtime/history";
+import { Conversation, StoredMessage, deriveTitle, lastMessagePreview, relativeTime, tabLabel } from "../runtime/history";
 
 export const VIEW_TYPE_HERMES = "hermes-chat";
+
+/** "842 chars" / "3.4k chars" — a rough size label for an attachment chip. */
+function formatAttachmentSize(chars: number): string {
+  return chars >= 1000 ? `${(chars / 1000).toFixed(1)}k chars` : `${chars} chars`;
+}
 
 /** Minimal shape of Electron's remote dialog, obtained via require("electron"). */
 interface ElectronRemote {
@@ -23,10 +29,27 @@ interface ElectronRemote {
   };
 }
 
+/** UI-only rendering hint for one message: display text + collapsed attachments. */
+interface MessageUiMeta {
+  display?: string;
+  ctx?: NoteContext;
+}
+
 interface Tab {
   id: string;
   title: string;
   messages: ChatMessage[];
+  /**
+   * Parallel to `messages` (same length, same indices) — the short display
+   * text and attachment chip data for user messages, kept separately from
+   * `messages[i].content` (the full prompt with embedded note/selection
+   * text, which is what's actually sent to the gateway). Without this, a
+   * restored conversation has no choice but to render the raw `content` in
+   * full, dumping the entire attached note back into the bubble every time
+   * the history entry is reopened. `undefined` for assistant/system
+   * entries and for user entries with no attachment.
+   */
+  uiMeta: (MessageUiMeta | undefined)[];
   sessionId?: string;
   handle: ChatHandle | null;
   bodyEl: HTMLElement; // scroll container holding this tab's messages
@@ -238,6 +261,7 @@ export class HermesView extends ItemView {
       id,
       title: `Chat ${this.tabSeq}`,
       messages: [],
+      uiMeta: [],
       handle: null,
       bodyEl,
       tabButtonEl,
@@ -458,8 +482,8 @@ export class HermesView extends ItemView {
   // ---- sending ----
 
   /** Public entry used by commands: push a prepared prompt into the active tab. */
-  submitPrompt(prompt: string): void {
-    void this.runTurn(prompt);
+  submitPrompt(prompt: string, display?: string, ctx?: NoteContext): void {
+    void this.runTurn(prompt, display, ctx);
   }
 
   private async onSend(): Promise<void> {
@@ -493,21 +517,25 @@ export class HermesView extends ItemView {
     }
 
     const { buildPrompt } = await import("../runtime/context");
-    const prompt = buildPrompt(text, {
+    const ctx: NoteContext = {
       notePath: this.includeNoteToggle.checked || this.includeSelectionToggle.checked ? notePath : undefined,
       selection,
       noteContent
-    });
+    };
+    const prompt = buildPrompt(text, ctx);
     this.inputEl.value = "";
-    await this.runTurn(prompt, text);
+    await this.runTurn(prompt, text, ctx);
   }
 
   /**
    * Run one conversation turn in the active tab.
    * @param prompt   the full prompt (with context) sent to Hermes
    * @param display  optional shorter text to show as the user bubble
+   * @param ctx      attached note/selection content, rendered as a
+   *                 collapsed chip under the bubble instead of being
+   *                 dumped inline (it's often much longer than the message)
    */
-  private async runTurn(prompt: string, display?: string): Promise<void> {
+  private async runTurn(prompt: string, display?: string, ctx?: NoteContext): Promise<void> {
     const tab = this.activeTab();
     if (!tab) return;
     if (tab.handle) {
@@ -516,11 +544,12 @@ export class HermesView extends ItemView {
     }
 
     this.clearGreeting(tab);
-    this.renderUserMessage(tab, display ?? prompt);
+    this.renderUserMessage(tab, display ?? prompt, ctx);
     const assistant = this.createAssistantMessage(tab);
 
     const history = tab.messages.slice();
     tab.messages.push({ role: "user", content: prompt });
+    tab.uiMeta.push(display !== undefined || ctx ? { display, ctx } : undefined);
 
     let buffer = "";
     let reasoning = "";
@@ -564,6 +593,7 @@ export class HermesView extends ItemView {
           assistant.contentEl.createDiv({ cls: "hermes-error", text: msg });
           tab.handle = null;
           tab.messages.push({ role: "assistant", content: `[error] ${msg}` });
+          tab.uiMeta.push(undefined);
           this.refreshRunningState();
           this.scrollToBottom(tab);
           this.saveTabHistory(tab);
@@ -571,6 +601,7 @@ export class HermesView extends ItemView {
         onDone: (sessionId) => {
           if (sessionId) tab.sessionId = sessionId;
           tab.messages.push({ role: "assistant", content: buffer });
+          tab.uiMeta.push(undefined);
           tab.handle = null;
           this.refreshRunningState();
           this.saveTabHistory(tab);
@@ -593,11 +624,47 @@ export class HermesView extends ItemView {
 
   // ---- rendering helpers ----
 
-  private renderUserMessage(tab: Tab, text: string): void {
+  private renderUserMessage(tab: Tab, text: string, ctx?: NoteContext): void {
     const msg = tab.bodyEl.createDiv({ cls: "hermes-msg hermes-msg-user" });
     msg.createDiv({ cls: "hermes-msg-role", text: "You" });
     msg.createDiv({ cls: "hermes-msg-content", text });
+    if (ctx) this.renderAttachments(msg, ctx);
     this.scrollToBottom(tab);
+  }
+
+  /**
+   * Render attached note/selection content as collapsed chips instead of
+   * dumping the raw text inline — a full note is often many times longer
+   * than the actual chat message and drowns it out. Collapsed by default;
+   * click a chip's header to see exactly what was sent to Hermes.
+   */
+  private renderAttachments(msg: HTMLElement, ctx: NoteContext): void {
+    const chips: { label: string; body: string }[] = [];
+    const baseName = (p?: string) => (p ? (p.split("/").pop() ?? p) : "current note");
+
+    if (ctx.noteContent && ctx.noteContent.trim()) {
+      chips.push({
+        label: `note: ${baseName(ctx.notePath)} (${formatAttachmentSize(ctx.noteContent.length)})`,
+        body: ctx.noteContent
+      });
+    }
+    if (ctx.selection && ctx.selection.trim()) {
+      chips.push({
+        label: `selection: ${baseName(ctx.notePath)} (${formatAttachmentSize(ctx.selection.length)})`,
+        body: ctx.selection
+      });
+    }
+
+    for (const chip of chips) {
+      const wrap = msg.createDiv({ cls: "hermes-attachment" });
+      const titleEl = wrap.createDiv({ cls: "hermes-attachment-title", text: `▸ ${chip.label}` });
+      const bodyEl = wrap.createDiv({ cls: "hermes-attachment-body" });
+      bodyEl.setText(chip.body);
+      titleEl.addEventListener("click", () => {
+        const expanded = wrap.classList.toggle("is-expanded");
+        titleEl.setText(`${expanded ? "▾" : "▸"} ${chip.label}`);
+      });
+    }
   }
 
   private createAssistantMessage(tab: Tab): {
@@ -652,12 +719,25 @@ export class HermesView extends ItemView {
   /** Persist the active tab's conversation after a completed (or failed) turn. */
   private saveTabHistory(tab: Tab): void {
     if (!tab.messages.length) return;
+    const messages: StoredMessage[] = tab.messages.map((m, i) => {
+      const meta = tab.uiMeta[i];
+      const stored: StoredMessage = { role: m.role, content: m.content };
+      if (meta?.display !== undefined) stored.display = meta.display;
+      if (meta?.ctx && (meta.ctx.noteContent || meta.ctx.selection)) {
+        stored.attachments = {
+          notePath: meta.ctx.notePath,
+          noteContent: meta.ctx.noteContent,
+          selection: meta.ctx.selection
+        };
+      }
+      return stored;
+    });
     const entry: Conversation = {
       id: tab.historyId,
-      title: deriveTitle(tab.messages),
+      title: deriveTitle(messages),
       sessionId: tab.sessionId,
       updatedAt: Date.now(),
-      messages: tab.messages.map((m) => ({ role: m.role, content: m.content }))
+      messages
     };
     void this.plugin.saveConversation(entry);
   }
@@ -690,6 +770,20 @@ export class HermesView extends ItemView {
 
     tab.bodyEl.empty();
     tab.messages = conv.messages.map((m) => ({ role: m.role, content: m.content }));
+    tab.uiMeta = conv.messages.map((m) =>
+      m.display !== undefined || m.attachments
+        ? {
+            display: m.display,
+            ctx: m.attachments
+              ? {
+                  notePath: m.attachments.notePath,
+                  noteContent: m.attachments.noteContent,
+                  selection: m.attachments.selection
+                }
+              : undefined
+          }
+        : undefined
+    );
     tab.sessionId = conv.sessionId;
     tab.historyId = conv.id;
     tab.lastPromptTokens = 0;
@@ -704,9 +798,13 @@ export class HermesView extends ItemView {
 
   /** Re-render a restored conversation's messages into its tab body. */
   private renderRestoredMessages(tab: Tab): void {
-    for (const m of tab.messages) {
+    tab.messages.forEach((m, i) => {
       if (m.role === "user") {
-        this.renderUserMessage(tab, m.content);
+        const meta = tab.uiMeta[i];
+        // Old history entries saved before uiMeta existed have no display
+        // text, so this still falls back to the raw content — same as
+        // before this fix, not a regression, just not de-duplicated.
+        this.renderUserMessage(tab, meta?.display ?? m.content, meta?.ctx);
       } else if (m.role === "assistant") {
         const assistant = this.createAssistantMessage(tab);
         const content = m.content || "";
@@ -717,7 +815,7 @@ export class HermesView extends ItemView {
         }
       }
       // system messages are context-only and not shown in the UI
-    }
+    });
     this.scrollToBottom(tab);
   }
 }

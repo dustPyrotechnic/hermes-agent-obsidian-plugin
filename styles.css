@@ -131,6 +131,41 @@
   padding: 2px 0;
 }
 
+/* Attached note/selection content on a user bubble — collapsed by default
+   so a long note doesn't drown out the actual typed message. */
+.hermes-attachment {
+  margin-top: 6px;
+  font-size: var(--font-ui-smaller);
+}
+
+.hermes-attachment-title {
+  display: inline-block;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.hermes-attachment-title:hover {
+  color: var(--text-normal);
+  text-decoration: underline;
+}
+
+.hermes-attachment-body {
+  display: none;
+  white-space: pre-wrap;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  color: var(--text-muted);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.hermes-attachment.is-expanded .hermes-attachment-body {
+  display: block;
+}
+
 .hermes-reasoning {
   display: none;
   border-left: 2px solid var(--background-modifier-border);

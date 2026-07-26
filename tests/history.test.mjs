@@ -186,3 +186,54 @@ test("parseHistoryFile accepts a bare array form", () => {
   assert.equal(out.length, 1);
   assert.equal(out[0].title, "hey");
 });
+
+test("deriveTitle and lastMessagePreview prefer display over the raw attached content", () => {
+  const messages = [
+    {
+      role: "user",
+      content: "Please review the current note.\n\n<current_note>\n<file_path>x.md</file_path>\n<content>\n" +
+        "a".repeat(2000) +
+        "\n</content>\n</current_note>",
+      display: "Please review the current note.",
+      attachments: { notePath: "x.md", noteContent: "a".repeat(2000) }
+    },
+    { role: "assistant", content: "Looks good." }
+  ];
+  assert.equal(deriveTitle(messages), "Please review the current note.");
+  assert.equal(lastMessagePreview(messages), "Hermes: Looks good.");
+});
+
+test("parseHistoryFile round-trips display + attachments, and drops an empty attachments object", () => {
+  const list = [
+    {
+      id: "a",
+      title: "A",
+      updatedAt: 1,
+      messages: [
+        {
+          role: "user",
+          content: "full prompt with note dumped in",
+          display: "short message",
+          attachments: { notePath: "note.md", noteContent: "the whole note" }
+        },
+        { role: "assistant", content: "ok" }
+      ]
+    }
+  ];
+  const round = parseHistoryFile(serializeHistoryFile(list));
+  assert.deepEqual(round, list.map((c) => ({ ...c, sessionId: undefined })));
+
+  // A message with no real attachment fields (garbage object) shouldn't
+  // resurrect an empty `attachments` key.
+  const out = parseHistoryFile(
+    JSON.stringify({
+      conversations: [
+        {
+          id: "b",
+          messages: [{ role: "user", content: "hi", attachments: { unrelated: true } }]
+        }
+      ]
+    })
+  );
+  assert.equal(out[0].messages[0].attachments, undefined);
+});

@@ -8,6 +8,19 @@
 export interface StoredMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  /**
+   * UI-only fields for user messages that had a note/selection attached:
+   * `display` is the short text actually typed (what `content` looks like
+   * once the embedded `<current_note>`/`<editor_selection>` blocks are
+   * stripped back out), and `attachments` is the raw attached text, shown
+   * as a collapsed chip instead of being dumped inline. Without these, a
+   * restored conversation falls back to showing the raw `content` in full
+   * — the entire note, un-collapsed, every time the history entry is
+   * reopened. Absent on assistant/system messages and on history saved
+   * before this field existed.
+   */
+  display?: string;
+  attachments?: { notePath?: string; noteContent?: string; selection?: string };
 }
 
 export interface Conversation {
@@ -25,10 +38,22 @@ export interface Conversation {
 /** Max conversations retained on disk (oldest dropped beyond this). */
 export const MAX_CONVERSATIONS = 100;
 
+/**
+ * The text a message should be shown as: `display` when the message had a
+ * note/selection attached (so titles/previews read as the actual typed
+ * message, not a raw `<current_note>...</current_note>` dump), else the
+ * plain `content`.
+ */
+function displayText(m: StoredMessage): string {
+  return m.display ?? m.content;
+}
+
 /** First non-empty user line, collapsed and trimmed to a short title. */
 export function deriveTitle(messages: StoredMessage[]): string {
-  const firstUser = messages.find((m) => m.role === "user" && m.content.trim());
-  const raw = (firstUser?.content || "").replace(/\s+/g, " ").trim();
+  const firstUser = messages.find((m) => m.role === "user" && displayText(m).trim());
+  const raw = displayText(firstUser ?? { role: "user", content: "" })
+    .replace(/\s+/g, " ")
+    .trim();
   if (!raw) return "New chat";
   return raw.length > 60 ? raw.slice(0, 57) + "..." : raw;
 }
@@ -42,11 +67,11 @@ export function deriveTitle(messages: StoredMessage[]): string {
  * Returns "" when there is nothing beyond the opening message to preview.
  */
 export function lastMessagePreview(messages: StoredMessage[], max = 80): string {
-  const visible = messages.filter((m) => m.role !== "system" && m.content.trim());
+  const visible = messages.filter((m) => m.role !== "system" && displayText(m).trim());
   if (visible.length < 2) return "";
   const last = visible[visible.length - 1];
   const who = last.role === "user" ? "You" : "Hermes";
-  const raw = last.content.replace(/\s+/g, " ").trim();
+  const raw = displayText(last).replace(/\s+/g, " ").trim();
   const body = raw.length > max ? raw.slice(0, max - 3) + "..." : raw;
   return `${who}: ${body}`;
 }
@@ -125,7 +150,17 @@ export function parseHistoryFile(text: string): Conversation[] {
         typeof m.role === "string" &&
         VALID_ROLES.has(m.role)
       ) {
-        messages.push({ role: m.role as StoredMessage["role"], content: m.content });
+        const msg: StoredMessage = { role: m.role as StoredMessage["role"], content: m.content };
+        if (typeof m.display === "string") msg.display = m.display;
+        if (isRecord(m.attachments)) {
+          const a = m.attachments;
+          const attachments: StoredMessage["attachments"] = {};
+          if (typeof a.notePath === "string") attachments.notePath = a.notePath;
+          if (typeof a.noteContent === "string") attachments.noteContent = a.noteContent;
+          if (typeof a.selection === "string") attachments.selection = a.selection;
+          if (Object.keys(attachments).length > 0) msg.attachments = attachments;
+        }
+        messages.push(msg);
       }
     }
     out.push({

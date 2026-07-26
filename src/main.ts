@@ -455,8 +455,9 @@ export default class HermesPlugin extends Plugin {
     if (!view) return;
     const notePath = mdView.file?.path;
     const noteContent = this.settings.includeNoteContent ? mdView.editor.getValue() : undefined;
-    const prompt = buildPrompt("Please review the current note.", { notePath, noteContent });
-    view.submitPrompt(prompt);
+    const display = "Please review the current note.";
+    const prompt = buildPrompt(display, { notePath, noteContent });
+    view.submitPrompt(prompt, display, { notePath, noteContent });
   }
 
   private async sendSelection(mdView: MarkdownView, selection: string): Promise<void> {
@@ -467,7 +468,8 @@ export default class HermesPlugin extends Plugin {
     const view = await this.activateView();
     if (!view) return;
     const notePath = mdView.file?.path;
-    const prompt = buildPrompt("Please review the selected text.", { notePath, selection });
-    view.submitPrompt(prompt);
+    const display = "Please review the selected text.";
+    const prompt = buildPrompt(display, { notePath, selection });
+    view.submitPrompt(prompt, display, { notePath, selection });
   }
 }
