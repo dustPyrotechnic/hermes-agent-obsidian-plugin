@@ -160,9 +160,9 @@ export class HermesView extends ItemView {
 
     this.metaModelEl = metaEl.createDiv({
       cls: "hermes-meta-item hermes-meta-model",
-      attr: { "aria-label": "Model — click for settings" }
+      attr: { "aria-label": "Model — click to switch" }
     });
-    this.metaModelEl.onclick = () => this.openPluginSettings();
+    this.metaModelEl.onclick = (e) => void this.showModelMenu(e);
 
     this.metaThinkingEl = metaEl.createDiv({
       cls: "hermes-meta-item hermes-meta-thinking",
@@ -411,6 +411,56 @@ export class HermesView extends ItemView {
       );
     }
     menu.showAtMouseEvent(evt);
+  }
+
+  /**
+   * Context menu to switch models without leaving the chat panel — fetches
+   * the gateway's live model list (same call "Test connection" uses in
+   * Settings) and lets you pick one, or fall back to the auto-resolved
+   * default. Previously this chip just opened Settings and made you paste
+   * a model id by hand.
+   */
+  private async showModelMenu(evt: MouseEvent): Promise<void> {
+    const menu = new Menu();
+    menu.addItem((item) => item.setTitle("Loading models...").setDisabled(true));
+    menu.showAtMouseEvent(evt);
+
+    let models: string[] = [];
+    try {
+      models = await this.client.listModels();
+    } catch {
+      /* fall through with an empty list — the "auto-detect" item still works */
+    }
+
+    const current = this.plugin.settings.model || "";
+    const rebuilt = new Menu();
+    rebuilt.addItem((item) =>
+      item
+        .setTitle("(auto-detect from Hermes config)")
+        .setChecked(current === "")
+        .onClick(() => void this.setModel(""))
+    );
+    if (models.length === 0) {
+      rebuilt.addItem((item) =>
+        item.setTitle("No models reported by gateway — check connection in Settings").setDisabled(true)
+      );
+    }
+    for (const id of models) {
+      rebuilt.addItem((item) =>
+        item
+          .setTitle(humanizeModel(id) || id)
+          .setChecked(current === id)
+          .onClick(() => void this.setModel(id))
+      );
+    }
+    menu.hide();
+    rebuilt.showAtMouseEvent(evt);
+  }
+
+  private async setModel(id: string): Promise<void> {
+    this.plugin.settings.model = id;
+    await this.plugin.saveSettings();
+    this.plugin.reloadModelInViews();
   }
 
   /**
