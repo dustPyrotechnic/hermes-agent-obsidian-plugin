@@ -101,6 +101,25 @@ export function runCompletedUsage(event: Record<string, unknown>): UsageInfo | n
   };
 }
 
+/**
+ * Extract usage from an OpenAI-style chat.completions stream chunk (only the
+ * final chunk carries it, and only when the request set
+ * `stream_options.include_usage`). Field names differ from the Runs
+ * transport's `run.completed` event (input_tokens/output_tokens) — Chat
+ * Completions uses prompt_tokens/completion_tokens.
+ */
+export function chatCompletionUsage(json: unknown): UsageInfo | null {
+  const j = json as { usage?: unknown };
+  const usage = j?.usage;
+  if (!usage || typeof usage !== "object") return null;
+  const u = usage as Record<string, unknown>;
+  return {
+    promptTokens: Number(u.prompt_tokens) || 0,
+    completionTokens: Number(u.completion_tokens) || 0,
+    totalTokens: Number(u.total_tokens) || 0
+  };
+}
+
 /** Extract assistant text delta from an OpenAI-style chat.completions chunk. */
 export function chatDeltaContent(json: unknown): string {
   const j = json as { choices?: Array<{ delta?: { content?: unknown } }> };
