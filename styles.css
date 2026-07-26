@@ -175,18 +175,35 @@
   font-size: var(--font-ui-smaller);
 }
 
+/* Reveals the title bar once there's reasoning content to toggle — the body
+   stays collapsed (see .hermes-reasoning-body below) until the user clicks
+   it. */
 .hermes-reasoning.is-visible {
   display: block;
 }
 
 .hermes-reasoning-title {
+  display: inline-block;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   opacity: 0.7;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hermes-reasoning-title:hover {
+  opacity: 1;
+  text-decoration: underline;
 }
 
 .hermes-reasoning-body {
+  display: none;
   white-space: pre-wrap;
+  margin-top: 4px;
+}
+
+.hermes-reasoning.is-expanded .hermes-reasoning-body {
+  display: block;
 }
 
 .hermes-tools {

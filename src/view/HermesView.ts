@@ -677,9 +677,20 @@ export class HermesView extends ItemView {
     const msg = tab.bodyEl.createDiv({ cls: "hermes-msg hermes-msg-assistant" });
     msg.createDiv({ cls: "hermes-msg-role", text: "Hermes" });
 
+    // Collapsed by default: the title is a toggle, the body only shows once
+    // the user opts in by clicking it (reasoning traces are long and mostly
+    // not what people want to read first).
     const reasoningEl = msg.createDiv({ cls: "hermes-reasoning" });
-    reasoningEl.createDiv({ cls: "hermes-reasoning-title", text: "thinking" });
+    // Plain-text arrow rather than an icon glyph — guaranteed to render (no
+    // dependency on a lucide icon name resolving) so the toggle affordance
+    // is always visible, and the arrow direction makes the current
+    // collapsed/expanded state unambiguous at a glance.
+    const reasoningTitleEl = reasoningEl.createDiv({ cls: "hermes-reasoning-title", text: "▸ thinking" });
     const reasoningBodyEl = reasoningEl.createDiv({ cls: "hermes-reasoning-body" });
+    reasoningTitleEl.addEventListener("click", () => {
+      const expanded = reasoningEl.classList.toggle("is-expanded");
+      reasoningTitleEl.setText(expanded ? "▾ thinking" : "▸ thinking");
+    });
 
     const toolsEl = msg.createDiv({ cls: "hermes-tools" });
     const contentEl = msg.createDiv({ cls: "hermes-msg-content" });
