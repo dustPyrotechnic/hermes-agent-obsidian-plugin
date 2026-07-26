@@ -557,6 +557,17 @@
   padding: 4px 14px;
 }
 
+/* While a turn is streaming, the same button switches to "Stop" in place —
+   give it a distinct warning tint so the state change is obvious. */
+.hermes-send-btn.is-running {
+  background: var(--background-modifier-error, var(--interactive-accent));
+  color: var(--text-on-accent);
+}
+
+.hermes-send-btn.is-running:hover {
+  background: var(--text-error);
+}
+
 .hermes-test-result {
   margin-top: 4px;
 }

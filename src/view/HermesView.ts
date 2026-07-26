@@ -68,7 +68,6 @@ export class HermesView extends ItemView {
   private bodyHostEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private sendBtn!: HTMLButtonElement;
-  private stopBtn!: HTMLButtonElement;
   private includeNoteToggle!: HTMLInputElement;
   private includeSelectionToggle!: HTMLInputElement;
   private statusEl!: HTMLElement;
@@ -121,10 +120,8 @@ export class HermesView extends ItemView {
     const newTabBtn = headerActions.createEl("button", { cls: "hermes-icon-btn", attr: { "aria-label": "New tab" } });
     setIcon(newTabBtn, "plus");
     newTabBtn.onclick = () => this.newTab();
-    this.stopBtn = headerActions.createEl("button", { cls: "hermes-icon-btn", attr: { "aria-label": "Stop" } });
-    setIcon(this.stopBtn, "square");
-    this.stopBtn.onclick = () => this.stopActive();
-    this.stopBtn.disabled = true;
+    // Stop lives on the send button now (see rightEl below) — a running turn
+    // turns "Send" into "Stop" in place instead of a separate header button.
 
     // Tab bar
     this.tabBarEl = root.createDiv({ cls: "hermes-tabbar" });
@@ -191,8 +188,13 @@ export class HermesView extends ItemView {
 
     const rightEl = inputActions.createDiv({ cls: "hermes-input-actions-right" });
     this.statusEl = rightEl.createSpan({ cls: "hermes-status" });
+    // Dual-purpose: "Send" while idle, becomes "Stop" in place once a turn
+    // is streaming (previously a separate header button, easy to miss).
     this.sendBtn = rightEl.createEl("button", { cls: "hermes-send-btn", text: "Send" });
-    this.sendBtn.onclick = () => void this.onSend();
+    this.sendBtn.onclick = () => {
+      if (this.activeTab()?.handle) this.stopActive();
+      else void this.onSend();
+    };
 
     // First tab
     this.newTab();
@@ -318,8 +320,8 @@ export class HermesView extends ItemView {
 
   private refreshRunningState(): void {
     const running = !!this.activeTab()?.handle;
-    this.stopBtn.disabled = !running;
-    this.sendBtn.disabled = running;
+    this.sendBtn.setText(running ? "Stop" : "Send");
+    this.sendBtn.classList.toggle("is-running", running);
     this.statusEl.setText(running ? "Hermes is thinking..." : "");
   }
 
