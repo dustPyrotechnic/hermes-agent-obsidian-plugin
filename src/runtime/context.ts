@@ -103,3 +103,48 @@ export function contextFolderInstructions(folder: string): string {
     `pastes or attaches with the "current note" / "selection" toggles instead.`
   );
 }
+
+/**
+ * Reminds the model that its replies render through Obsidian's own Markdown
+ * renderer inside a narrow chat bubble — not a generic chat window. Without
+ * this, replies tend to drift into loosely-formatted prose (unlabeled code,
+ * inconsistent heading levels, ASCII tables) that the renderer can't clean
+ * up after the fact. Always included, independent of the working-folder
+ * instructions (which are folder-specific and can be empty).
+ */
+export function markdownFormattingInstructions(): string {
+  return (
+    `Your replies are rendered as Markdown inside a narrow Obsidian sidebar panel, ` +
+    `so formatting choices matter. Follow standard Markdown conventions: fence code ` +
+    `with triple backticks and a language tag (\`\`\`ts, \`\`\`bash, ...), use "-" for ` +
+    `bullet lists and "1." for ordered lists with a blank line before/after, use real ` +
+    `Markdown tables (header row + "---" separator row) instead of hand-aligned ASCII ` +
+    `tables, wrap inline code/identifiers/paths in single backticks, and keep headings ` +
+    `to "##" or lower (the panel is narrow — an "#" heading is oversized). Prefer short ` +
+    `paragraphs and lists over long blocks of prose. Don't wrap the entire reply in a ` +
+    `code fence — only actual code/config/output goes in a fence.`
+  );
+}
+
+export interface SystemInstructionOptions {
+  /** Include the built-in Markdown-formatting reminder. Default true. */
+  markdownFormattingEnabled?: boolean;
+  /** User-authored text appended after the built-in instructions. */
+  customPrompt?: string;
+}
+
+/**
+ * Combines the working-folder instructions (may be empty), the optional
+ * built-in Markdown-formatting reminder, and the user's own custom system
+ * prompt (Settings → System prompt) into the single `instructions`/system
+ * message sent to the gateway. Order matters a little: folder/workspace
+ * facts first, then house-keeping formatting rules, then whatever the user
+ * wants to say last (so it reads as the most specific/overriding voice).
+ */
+export function buildSystemInstructions(folder: string, opts: SystemInstructionOptions = {}): string {
+  const parts = [contextFolderInstructions(folder)];
+  if (opts.markdownFormattingEnabled !== false) parts.push(markdownFormattingInstructions());
+  const custom = (opts.customPrompt || "").trim();
+  if (custom) parts.push(custom);
+  return parts.filter(Boolean).join("\n\n");
+}

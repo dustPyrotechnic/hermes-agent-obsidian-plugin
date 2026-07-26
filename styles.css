@@ -724,3 +724,12 @@
 .hermes-graph-empty.is-visible {
   display: flex;
 }
+
+/* ---- Settings tab -------------------------------------------------------- */
+
+.hermes-settings-textarea {
+  width: 100%;
+  min-width: 100%;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+}

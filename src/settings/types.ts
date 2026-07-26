@@ -56,6 +56,20 @@ export interface HermesSettings {
   graphMinEdgeWeight: number;
   /** Smart graph: also draw explicit [[wikilink]] edges alongside semantic ones. */
   graphIncludeWikilinks: boolean;
+  /**
+   * Built-in reminder that replies render as Markdown in a narrow sidebar
+   * (fenced code, real tables, capped heading levels, etc.). On by default;
+   * turn off if it conflicts with a custom system prompt below or with the
+   * agent's own persona/instructions.
+   */
+  markdownFormattingPromptEnabled: boolean;
+  /**
+   * Free-text instructions appended to every turn's system message, after
+   * the working-folder and Markdown-formatting instructions (if enabled).
+   * Use it for persona, tone, house style, or anything else you want Hermes
+   * to consistently follow in this vault.
+   */
+  customSystemPrompt: string;
 }
 
 export const DEFAULT_SETTINGS: HermesSettings = {
@@ -73,5 +87,7 @@ export const DEFAULT_SETTINGS: HermesSettings = {
   hermesHome: "",
   graphMaxNotes: 150,
   graphMinEdgeWeight: 0.3,
-  graphIncludeWikilinks: true
+  graphIncludeWikilinks: true,
+  markdownFormattingPromptEnabled: true,
+  customSystemPrompt: ""
 };

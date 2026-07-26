@@ -33,7 +33,7 @@ import {
   supportsRunsTransport,
   toolEventFromRunEvent
 } from "./protocol";
-import { contextFolderInstructions, resolveWorkingFolder } from "./context";
+import { buildSystemInstructions, resolveWorkingFolder } from "./context";
 
 export type { HermesCapabilities, ToolEvent, UsageInfo } from "./protocol";
 
@@ -94,7 +94,11 @@ export class HermesGatewayClient {
    * vault is communicated as the working directory.
    */
   private workingFolderInstructions(): string {
-    return contextFolderInstructions(this.workingFolderPath());
+    const s = this.getSettings();
+    return buildSystemInstructions(this.workingFolderPath(), {
+      markdownFormattingEnabled: s.markdownFormattingPromptEnabled,
+      customPrompt: s.customSystemPrompt
+    });
   }
 
   private authHeaders(): Record<string, string> {
@@ -469,7 +473,10 @@ export class HermesGatewayClient {
       conversation_history: history.map((m) => ({ role: m.role, content: m.content }))
     };
     const folder = this.workingFolderPath();
-    const instructions = contextFolderInstructions(folder);
+    const instructions = buildSystemInstructions(folder, {
+      markdownFormattingEnabled: s.markdownFormattingPromptEnabled,
+      customPrompt: s.customSystemPrompt
+    });
     if (instructions) bodyObj.instructions = instructions;
     // Forward-compat: the current gateway ignores extra body keys, but the
     // upstream fix for true vault access is for /v1/runs to honor a per-run

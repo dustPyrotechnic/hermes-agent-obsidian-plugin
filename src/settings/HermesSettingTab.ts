@@ -202,6 +202,40 @@ export class HermesSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("System prompt")
+      .setDesc("Instructions sent with every turn, alongside the working-folder context.")
+      .setHeading();
+
+    new Setting(containerEl)
+      .setName("Markdown formatting reminder")
+      .setDesc(
+        "Built-in instruction telling Hermes its replies render as Markdown in a narrow sidebar (fenced code blocks, real tables, headings capped at ##, etc.). Turn off if it conflicts with your own custom prompt below."
+      )
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.markdownFormattingPromptEnabled).onChange(async (v) => {
+          this.plugin.settings.markdownFormattingPromptEnabled = v;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Custom system prompt")
+      .setDesc(
+        "Optional. Appended to the system message on every turn — persona, tone, house style, anything you want Hermes to consistently follow in this vault."
+      )
+      .addTextArea((ta) => {
+        ta.setPlaceholder("e.g. Always answer in Chinese. Cite note titles you drew on before giving your answer.")
+          .setValue(this.plugin.settings.customSystemPrompt)
+          .onChange(async (v) => {
+            this.plugin.settings.customSystemPrompt = v;
+            await this.plugin.saveSettings();
+          });
+        ta.inputEl.rows = 5;
+        ta.inputEl.addClass("hermes-settings-textarea");
+        return ta;
+      });
+
+    new Setting(containerEl)
       .setName("Smart graph")
       .setDesc(
         "An agent-built relationship graph: Hermes reads your notes and surfaces semantic links (shared topics, elaborations, prerequisites) beyond explicit [[wikilinks]]. Open it from the ribbon or the \"Open smart graph\" command, then click \"Analyze vault\"."

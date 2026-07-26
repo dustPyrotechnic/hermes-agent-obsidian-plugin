@@ -5,7 +5,12 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveWorkingFolder, contextFolderInstructions } from "./.build/context.mjs";
+import {
+  resolveWorkingFolder,
+  contextFolderInstructions,
+  markdownFormattingInstructions,
+  buildSystemInstructions
+} from "./.build/context.mjs";
 
 test("resolveWorkingFolder returns the vault root when no sub-folder is set", () => {
   assert.equal(resolveWorkingFolder("C:\\Users\\me\\Vault", ""), "C:\\Users\\me\\Vault");
@@ -54,4 +59,36 @@ test("contextFolderInstructions tells the agent to degrade gracefully if sandbox
   assert.ok(/sandbox/i.test(msg));
   assert.ok(/don't have filesystem access|filesystem access/i.test(msg));
   assert.ok(/paste|attach/i.test(msg));
+});
+
+test("markdownFormattingInstructions mentions the sidebar-specific formatting rules", () => {
+  const msg = markdownFormattingInstructions();
+  assert.ok(/markdown/i.test(msg));
+  assert.ok(/```/.test(msg));
+  assert.ok(/table/i.test(msg));
+});
+
+test("buildSystemInstructions includes folder + formatting reminder by default", () => {
+  const msg = buildSystemInstructions("/home/me/Vault");
+  assert.ok(msg.includes("/home/me/Vault"));
+  assert.ok(/markdown/i.test(msg));
+});
+
+test("buildSystemInstructions omits the formatting reminder when disabled", () => {
+  const msg = buildSystemInstructions("/home/me/Vault", { markdownFormattingEnabled: false });
+  assert.ok(msg.includes("/home/me/Vault"));
+  assert.ok(!/rendered as markdown/i.test(msg));
+});
+
+test("buildSystemInstructions appends a trimmed custom prompt last", () => {
+  const msg = buildSystemInstructions("/home/me/Vault", { customPrompt: "  Always answer in Chinese.  " });
+  assert.ok(msg.trim().endsWith("Always answer in Chinese."));
+});
+
+test("buildSystemInstructions works from an empty folder with only a custom prompt", () => {
+  const msg = buildSystemInstructions("", {
+    markdownFormattingEnabled: false,
+    customPrompt: "Be terse."
+  });
+  assert.equal(msg, "Be terse.");
 });
