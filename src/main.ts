@@ -88,23 +88,23 @@ export default class HermesPlugin extends Plugin {
       if (sel) this.setSelectionSnapshot({ notePath: view.file?.path, text: sel });
     });
 
-    this.addRibbonIcon("bot", "Open Hermes Agent", () => {
+    this.addRibbonIcon("bot", "打开 Hermes Agent", () => {
       void this.activateView();
     });
 
-    this.addRibbonIcon("git-fork", "Open Hermes smart graph", () => {
+    this.addRibbonIcon("git-fork", "打开 Hermes 知识图谱", () => {
       void this.activateGraphView();
     });
 
     this.addCommand({
       id: "open-view",
-      name: "Open chat view",
+      name: "打开聊天面板",
       callback: () => void this.activateView()
     });
 
     this.addCommand({
       id: "new-tab",
-      name: "New chat tab",
+      name: "新建聊天标签页",
       callback: async () => {
         const view = await this.activateView();
         view?.newTab();
@@ -113,13 +113,13 @@ export default class HermesPlugin extends Plugin {
 
     this.addCommand({
       id: "open-graph",
-      name: "Open smart graph",
+      name: "打开知识图谱",
       callback: () => void this.activateGraphView()
     });
 
     this.addCommand({
       id: "analyze-graph",
-      name: "Analyze vault for smart graph",
+      name: "分析当前库以生成知识图谱",
       callback: async () => {
         const view = await this.activateGraphView();
         view?.analyzeFromCommand();
@@ -128,7 +128,7 @@ export default class HermesPlugin extends Plugin {
 
     this.addCommand({
       id: "send-note",
-      name: "Send current note to Hermes",
+      name: "将当前笔记发送给 Hermes",
       checkCallback: (checking) => {
         const mdView = this.getActiveMarkdownView();
         if (!mdView) return false;
@@ -139,7 +139,7 @@ export default class HermesPlugin extends Plugin {
 
     this.addCommand({
       id: "send-selection",
-      name: "Send selection to Hermes",
+      name: "将选中内容发送给 Hermes",
       // Not editorCheckCallback: that only sees the CodeMirror selection,
       // which stays empty for text highlighted by dragging over Reading
       // View (rendered HTML, not the editor). captureViewSelection covers
@@ -455,20 +455,20 @@ export default class HermesPlugin extends Plugin {
     if (!view) return;
     const notePath = mdView.file?.path;
     const noteContent = this.settings.includeNoteContent ? mdView.editor.getValue() : undefined;
-    const display = "Please review the current note.";
+    const display = "请查看当前笔记。";
     const prompt = buildPrompt(display, { notePath, noteContent });
     view.submitPrompt(prompt, display, { notePath, noteContent });
   }
 
   private async sendSelection(mdView: MarkdownView, selection: string): Promise<void> {
     if (!selection) {
-      new Notice("Hermes: no text selected.");
+      new Notice("Hermes：没有选中任何文字。");
       return;
     }
     const view = await this.activateView();
     if (!view) return;
     const notePath = mdView.file?.path;
-    const display = "Please review the selected text.";
+    const display = "请查看选中的内容。";
     const prompt = buildPrompt(display, { notePath, selection });
     view.submitPrompt(prompt, display, { notePath, selection });
   }

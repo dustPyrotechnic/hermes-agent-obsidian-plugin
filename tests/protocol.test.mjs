@@ -175,9 +175,9 @@ test("parseContextLengthCache matches on the bare model id", () => {
 
 test("greetingOptions personalizes when a name is set", () => {
   const named = greetingOptions("Jason");
-  assert.ok(named.includes("What's new, Jason?"));
-  assert.ok(named.some((g) => g === "Hi Jason, how can I help?"));
+  assert.ok(named.includes("有什么新鲜事，Jason？"));
+  assert.ok(named.some((g) => g === "你好 Jason，需要我帮什么忙？"));
   const anon = greetingOptions("");
-  assert.ok(anon.includes("What's new?"));
-  assert.ok(anon.includes("How can I help you today?"));
+  assert.ok(anon.includes("有什么新鲜事？"));
+  assert.ok(anon.includes("今天需要我帮什么忙？"));
 });

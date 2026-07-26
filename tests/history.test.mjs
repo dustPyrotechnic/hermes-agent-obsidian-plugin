@@ -35,9 +35,9 @@ test("deriveTitle truncates long titles to 60 chars with an ellipsis", () => {
   assert.ok(out.endsWith("..."));
 });
 
-test("deriveTitle falls back to 'New chat' when there is no user text", () => {
-  assert.equal(deriveTitle([]), "New chat");
-  assert.equal(deriveTitle([{ role: "assistant", content: "only assistant" }]), "New chat");
+test("deriveTitle falls back to '新对话' when there is no user text", () => {
+  assert.equal(deriveTitle([]), "新对话");
+  assert.equal(deriveTitle([{ role: "assistant", content: "only assistant" }]), "新对话");
 });
 
 test("lastMessagePreview returns '' when there is nothing beyond the opening message", () => {
@@ -51,7 +51,7 @@ test("lastMessagePreview role-prefixes and collapses the final turn", () => {
       { role: "user", content: "first query" },
       { role: "assistant", content: "  the   answer \n is here " }
     ]),
-    "Hermes: the answer is here"
+    "Hermes：the answer is here"
   );
   assert.equal(
     lastMessagePreview([
@@ -59,15 +59,15 @@ test("lastMessagePreview role-prefixes and collapses the final turn", () => {
       { role: "assistant", content: "answer" },
       { role: "user", content: "follow up" }
     ]),
-    "You: follow up"
+    "你：follow up"
   );
 });
 
 test("lastMessagePreview truncates to max and ignores system/empty messages", () => {
   const long = "x".repeat(200);
   const out = lastMessagePreview([{ role: "user", content: "q" }, { role: "assistant", content: long }], 20);
-  assert.equal(out, `Hermes: ${"x".repeat(17)}...`);
-  assert.equal(out.length, "Hermes: ".length + 20);
+  assert.equal(out, `Hermes：${"x".repeat(17)}...`);
+  assert.equal(out.length, "Hermes：".length + 20);
 
   // A trailing system message must not become the preview.
   assert.equal(
@@ -76,13 +76,13 @@ test("lastMessagePreview truncates to max and ignores system/empty messages", ()
       { role: "assistant", content: "a" },
       { role: "system", content: "context blob" }
     ]),
-    "Hermes: a"
+    "Hermes：a"
   );
 });
 
 test("tabLabel shortens long titles and keeps short ones", () => {
   assert.equal(tabLabel("short"), "short");
-  assert.equal(tabLabel(""), "Chat");
+  assert.equal(tabLabel(""), "聊天");
   const out = tabLabel("a".repeat(40));
   assert.equal(out.length, 21); // 18 + "..."
   assert.ok(out.endsWith("..."));
@@ -134,12 +134,12 @@ test("removeConversation drops the matching id only", () => {
 
 test("relativeTime buckets seconds/minutes/hours/days", () => {
   const now = 1_000_000_000_000;
-  assert.equal(relativeTime(now, now - 10_000), "just now");
-  assert.equal(relativeTime(now, now - 5 * 60_000), "5m ago");
-  assert.equal(relativeTime(now, now - 3 * 3_600_000), "3h ago");
-  assert.equal(relativeTime(now, now - 2 * 86_400_000), "2d ago");
-  assert.equal(relativeTime(now, now - 14 * 86_400_000), "2w ago");
-  assert.equal(relativeTime(now, now - 60 * 86_400_000), "2mo ago");
+  assert.equal(relativeTime(now, now - 10_000), "刚刚");
+  assert.equal(relativeTime(now, now - 5 * 60_000), "5 分钟前");
+  assert.equal(relativeTime(now, now - 3 * 3_600_000), "3 小时前");
+  assert.equal(relativeTime(now, now - 2 * 86_400_000), "2 天前");
+  assert.equal(relativeTime(now, now - 14 * 86_400_000), "2 周前");
+  assert.equal(relativeTime(now, now - 60 * 86_400_000), "2 个月前");
 });
 
 test("parse/serialize round-trips conversations", () => {
@@ -200,7 +200,7 @@ test("deriveTitle and lastMessagePreview prefer display over the raw attached co
     { role: "assistant", content: "Looks good." }
   ];
   assert.equal(deriveTitle(messages), "Please review the current note.");
-  assert.equal(lastMessagePreview(messages), "Hermes: Looks good.");
+  assert.equal(lastMessagePreview(messages), "Hermes：Looks good.");
 });
 
 test("parseHistoryFile round-trips display + attachments, and drops an empty attachments object", () => {

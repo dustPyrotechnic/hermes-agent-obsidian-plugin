@@ -225,13 +225,11 @@ export function parseContextLengthCache(yamlText: string, modelId: string): numb
  */
 export function greetingOptions(userName: string): string[] {
   const name = (userName || "").trim();
-  const p = (base: string, fallback?: string): string =>
-    name ? `${base}, ${name}` : fallback ?? base;
   return [
-    p("What's new") + "?",
-    p("Welcome back") + "!",
-    p("How's it going") + "?",
-    p("Hey there"),
-    name ? `Hi ${name}, how can I help?` : "How can I help you today?"
+    name ? `有什么新鲜事，${name}？` : "有什么新鲜事？",
+    name ? `欢迎回来，${name}！` : "欢迎回来！",
+    name ? `最近怎么样，${name}？` : "最近怎么样？",
+    name ? `嗨，${name}` : "嗨",
+    name ? `你好 ${name}，需要我帮什么忙？` : "今天需要我帮什么忙？"
   ];
 }

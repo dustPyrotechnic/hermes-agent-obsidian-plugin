@@ -13,10 +13,20 @@ import { Conversation, StoredMessage, deriveTitle, lastMessagePreview, relativeT
 
 export const VIEW_TYPE_HERMES = "hermes-chat";
 
-/** "842 chars" / "3.4k chars" — a rough size label for an attachment chip. */
+/** "842 字符" / "3.4k 字符" — a rough size label for an attachment chip. */
 function formatAttachmentSize(chars: number): string {
-  return chars >= 1000 ? `${(chars / 1000).toFixed(1)}k chars` : `${chars} chars`;
+  return chars >= 1000 ? `${(chars / 1000).toFixed(1)}k 字符` : `${chars} 字符`;
 }
+
+/** Chinese display labels for the reasoning-effort enum (the stored value stays the English API string). */
+const REASONING_EFFORT_LABELS: Record<string, string> = {
+  "": "默认",
+  minimal: "最低",
+  low: "低",
+  medium: "中",
+  high: "高",
+  xhigh: "极高"
+};
 
 /** Minimal shape of Electron's remote dialog, obtained via require("electron"). */
 interface ElectronRemote {
@@ -113,11 +123,11 @@ export class HermesView extends ItemView {
     const headerActions = header.createDiv({ cls: "hermes-header-actions" });
     const historyBtn = headerActions.createEl("button", {
       cls: "hermes-icon-btn",
-      attr: { "aria-label": "Chat history" }
+      attr: { "aria-label": "聊天记录" }
     });
     setIcon(historyBtn, "history");
     historyBtn.onclick = () => this.openHistory();
-    const newTabBtn = headerActions.createEl("button", { cls: "hermes-icon-btn", attr: { "aria-label": "New tab" } });
+    const newTabBtn = headerActions.createEl("button", { cls: "hermes-icon-btn", attr: { "aria-label": "新建标签页" } });
     setIcon(newTabBtn, "plus");
     newTabBtn.onclick = () => this.newTab();
     // Stop lives on the send button now (see rightEl below) — a running turn
@@ -133,16 +143,16 @@ export class HermesView extends ItemView {
     const ctxRow = root.createDiv({ cls: "hermes-context-row" });
     const noteLabel = ctxRow.createEl("label", { cls: "hermes-context-toggle" });
     this.includeNoteToggle = noteLabel.createEl("input", { type: "checkbox" });
-    noteLabel.createSpan({ text: " current note" });
+    noteLabel.createSpan({ text: " 当前笔记" });
     const selLabel = ctxRow.createEl("label", { cls: "hermes-context-toggle" });
     this.includeSelectionToggle = selLabel.createEl("input", { type: "checkbox" });
-    selLabel.createSpan({ text: " selection" });
+    selLabel.createSpan({ text: " 选中内容" });
 
     // Input
     const inputWrap = root.createDiv({ cls: "hermes-input-wrap" });
     this.inputEl = inputWrap.createEl("textarea", {
       cls: "hermes-input",
-      attr: { rows: "3", placeholder: "Message Hermes..." }
+      attr: { rows: "3", placeholder: "给 Hermes 发消息..." }
     });
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -160,13 +170,13 @@ export class HermesView extends ItemView {
 
     this.metaModelEl = metaEl.createDiv({
       cls: "hermes-meta-item hermes-meta-model",
-      attr: { "aria-label": "Model — click to switch" }
+      attr: { "aria-label": "模型 — 点击切换" }
     });
     this.metaModelEl.onclick = (e) => void this.showModelMenu(e);
 
     this.metaThinkingEl = metaEl.createDiv({
       cls: "hermes-meta-item hermes-meta-thinking",
-      attr: { "aria-label": "Reasoning effort — click to change" }
+      attr: { "aria-label": "推理强度 — 点击切换" }
     });
     this.metaThinkingEl.onclick = (e) => this.showThinkingMenu(e);
 
@@ -174,7 +184,7 @@ export class HermesView extends ItemView {
     // by the latest turn's prompt tokens (like Claudian's gauge).
     this.metaTokensEl = metaEl.createDiv({
       cls: "hermes-meta-item hermes-meta-tokens",
-      attr: { "aria-label": "Context window used in this tab" }
+      attr: { "aria-label": "当前标签页的上下文占用" }
     });
     this.gaugeEl = this.metaTokensEl.createSpan({ cls: "hermes-gauge" });
     this.gaugePctEl = this.metaTokensEl.createSpan({ cls: "hermes-gauge-pct" });
@@ -190,7 +200,7 @@ export class HermesView extends ItemView {
     this.statusEl = rightEl.createSpan({ cls: "hermes-status" });
     // Dual-purpose: "Send" while idle, becomes "Stop" in place once a turn
     // is streaming (previously a separate header button, easy to miss).
-    this.sendBtn = rightEl.createEl("button", { cls: "hermes-send-btn", text: "Send" });
+    this.sendBtn = rightEl.createEl("button", { cls: "hermes-send-btn", text: "发送" });
     this.sendBtn.onclick = () => {
       if (this.activeTab()?.handle) this.stopActive();
       else void this.onSend();
@@ -252,7 +262,7 @@ export class HermesView extends ItemView {
 
   newTab(): void {
     if (this.tabs.length >= Math.max(1, this.plugin.settings.maxTabs)) {
-      new Notice(`Hermes: tab limit reached (${this.plugin.settings.maxTabs}). Adjust it in settings.`);
+      new Notice(`Hermes：已达到标签页数量上限（${this.plugin.settings.maxTabs}）。可在设置中调整。`);
       return;
     }
     this.tabSeq += 1;
@@ -261,7 +271,7 @@ export class HermesView extends ItemView {
     const tabButtonEl = this.tabBarEl.createDiv({ cls: "hermes-tab" });
     const tab: Tab = {
       id,
-      title: `Chat ${this.tabSeq}`,
+      title: `聊天 ${this.tabSeq}`,
       messages: [],
       uiMeta: [],
       handle: null,
@@ -320,9 +330,9 @@ export class HermesView extends ItemView {
 
   private refreshRunningState(): void {
     const running = !!this.activeTab()?.handle;
-    this.sendBtn.setText(running ? "Stop" : "Send");
+    this.sendBtn.setText(running ? "停止" : "发送");
     this.sendBtn.classList.toggle("is-running", running);
-    this.statusEl.setText(running ? "Hermes is thinking..." : "");
+    this.statusEl.setText(running ? "Hermes 正在思考…" : "");
   }
 
   /**
@@ -340,8 +350,11 @@ export class HermesView extends ItemView {
 
     // Reasoning effort
     this.metaThinkingEl.empty();
-    this.metaThinkingEl.createSpan({ cls: "hermes-meta-key", text: "Thinking: " });
-    this.metaThinkingEl.createSpan({ cls: "hermes-meta-val", text: s.reasoningEffort || "default" });
+    this.metaThinkingEl.createSpan({ cls: "hermes-meta-key", text: "推理：" });
+    this.metaThinkingEl.createSpan({
+      cls: "hermes-meta-val",
+      text: REASONING_EFFORT_LABELS[s.reasoningEffort || ""] || s.reasoningEffort
+    });
 
     // Context gauge — latest turn's prompt tokens as a % of the context window.
     const used = this.activeTab()?.lastPromptTokens || 0;
@@ -352,21 +365,21 @@ export class HermesView extends ItemView {
     this.metaTokensEl.toggleClass("hermes-hidden", used <= 0);
     this.metaTokensEl.setAttr(
       "aria-label",
-      `Context: ${used.toLocaleString()} / ${ctxWindow.toLocaleString()} tokens (${pct}%)`
+      `上下文占用：${used.toLocaleString()} / ${ctxWindow.toLocaleString()} tokens（${pct}%）`
     );
 
     // Working folder
     const base = this.plugin.getVaultBasePath();
     const folder = resolveWorkingFolder(base, s.workingFolder || "");
     const autoApprove = s.autoApproveTools !== false;
-    const name = folder ? folder.split(/[\\/]/).filter(Boolean).pop() || folder : "(no folder)";
+    const name = folder ? folder.split(/[\\/]/).filter(Boolean).pop() || folder : "（未设置文件夹）";
     this.folderLabelEl.setText(name);
     this.folderChipEl.toggleClass("is-readonly", !autoApprove);
     this.folderChipEl.setAttr(
       "aria-label",
-      `Working folder: ${folder || "(unavailable)"}\n` +
-        `Tools: ${autoApprove ? "auto-approve ON (read/write)" : "OFF (read-only replies)"}\n` +
-        `Click to choose a folder`
+      `工作文件夹：${folder || "（不可用）"}\n` +
+        `工具权限：${autoApprove ? "自动批准（可读写）" : "关闭（只读回复）"}\n` +
+        `点击选择文件夹`
     );
   }
 
@@ -391,12 +404,12 @@ export class HermesView extends ItemView {
     const menu = new Menu();
     const current = this.plugin.settings.reasoningEffort || "";
     const options: Array<{ value: string; label: string }> = [
-      { value: "", label: "default" },
-      { value: "minimal", label: "minimal" },
-      { value: "low", label: "low" },
-      { value: "medium", label: "medium" },
-      { value: "high", label: "high" },
-      { value: "xhigh", label: "xhigh" }
+      { value: "", label: REASONING_EFFORT_LABELS[""] },
+      { value: "minimal", label: REASONING_EFFORT_LABELS.minimal },
+      { value: "low", label: REASONING_EFFORT_LABELS.low },
+      { value: "medium", label: REASONING_EFFORT_LABELS.medium },
+      { value: "high", label: REASONING_EFFORT_LABELS.high },
+      { value: "xhigh", label: REASONING_EFFORT_LABELS.xhigh }
     ];
     for (const opt of options) {
       menu.addItem((item) =>
@@ -422,7 +435,7 @@ export class HermesView extends ItemView {
    */
   private async showModelMenu(evt: MouseEvent): Promise<void> {
     const menu = new Menu();
-    menu.addItem((item) => item.setTitle("Loading models...").setDisabled(true));
+    menu.addItem((item) => item.setTitle("正在加载模型…").setDisabled(true));
     menu.showAtMouseEvent(evt);
 
     let models: string[] = [];
@@ -436,13 +449,13 @@ export class HermesView extends ItemView {
     const rebuilt = new Menu();
     rebuilt.addItem((item) =>
       item
-        .setTitle("(auto-detect from Hermes config)")
+        .setTitle("（自动识别 Hermes 配置中的模型）")
         .setChecked(current === "")
         .onClick(() => void this.setModel(""))
     );
     if (models.length === 0) {
       rebuilt.addItem((item) =>
-        item.setTitle("No models reported by gateway — check connection in Settings").setDisabled(true)
+        item.setTitle("网关未返回任何模型 — 请在设置中检查连接").setDisabled(true)
       );
     }
     for (const id of models) {
@@ -479,7 +492,7 @@ export class HermesView extends ItemView {
       remote = undefined;
     }
     if (!remote?.dialog?.showOpenDialog) {
-      new Notice("Native folder picker unavailable. Set the working folder in settings.");
+      new Notice("无法使用原生文件夹选择器，请在设置中手动填写工作文件夹。");
       this.openPluginSettings();
       return;
     }
@@ -487,7 +500,7 @@ export class HermesView extends ItemView {
     try {
       const result = await remote.dialog.showOpenDialog({
         properties: ["openDirectory"],
-        title: "Select Hermes working folder",
+        title: "选择 Hermes 工作文件夹",
         ...(base ? { defaultPath: base } : {})
       });
       if (result.canceled || !result.filePaths || result.filePaths.length === 0) return;
@@ -495,9 +508,9 @@ export class HermesView extends ItemView {
       this.plugin.settings.workingFolder = this.toStoredFolder(picked, base);
       await this.plugin.saveSettings();
       this.plugin.refreshOpenViews();
-      new Notice(`Hermes working folder: ${picked}`);
+      new Notice(`Hermes 工作文件夹：${picked}`);
     } catch (e) {
-      new Notice(`Could not open folder picker: ${(e as Error)?.message || e}`);
+      new Notice(`无法打开文件夹选择器：${(e as Error)?.message || e}`);
     }
   }
 
@@ -527,7 +540,7 @@ export class HermesView extends ItemView {
       settingApi.open();
       settingApi.openTabById?.("hermes-agent");
     } else {
-      new Notice("Open Settings -> Hermes Agent to set the working folder.");
+      new Notice("请打开 设置 -> Hermes Agent 来设置工作文件夹。");
     }
   }
 
@@ -591,7 +604,7 @@ export class HermesView extends ItemView {
     const tab = this.activeTab();
     if (!tab) return;
     if (tab.handle) {
-      new Notice("Hermes: a response is already streaming in this tab.");
+      new Notice("Hermes：这个标签页正在生成回复，请稍候。");
       return;
     }
 
@@ -632,7 +645,7 @@ export class HermesView extends ItemView {
         },
         onUsage: (u: UsageInfo) => {
           assistant.usageEl.setText(
-            `tokens: ${u.totalTokens} (in ${u.promptTokens} / out ${u.completionTokens})`
+            `tokens：${u.totalTokens}（输入 ${u.promptTokens} / 输出 ${u.completionTokens}）`
           );
           tab.tokensUsed += u.totalTokens;
           // Context occupancy = the latest turn's prompt tokens (mirrors the
@@ -678,7 +691,7 @@ export class HermesView extends ItemView {
 
   private renderUserMessage(tab: Tab, text: string, ctx?: NoteContext): void {
     const msg = tab.bodyEl.createDiv({ cls: "hermes-msg hermes-msg-user" });
-    msg.createDiv({ cls: "hermes-msg-role", text: "You" });
+    msg.createDiv({ cls: "hermes-msg-role", text: "你" });
     msg.createDiv({ cls: "hermes-msg-content", text });
     if (ctx) this.renderAttachments(msg, ctx);
     this.scrollToBottom(tab);
@@ -692,17 +705,17 @@ export class HermesView extends ItemView {
    */
   private renderAttachments(msg: HTMLElement, ctx: NoteContext): void {
     const chips: { label: string; body: string }[] = [];
-    const baseName = (p?: string) => (p ? (p.split("/").pop() ?? p) : "current note");
+    const baseName = (p?: string) => (p ? (p.split("/").pop() ?? p) : "当前笔记");
 
     if (ctx.noteContent && ctx.noteContent.trim()) {
       chips.push({
-        label: `note: ${baseName(ctx.notePath)} (${formatAttachmentSize(ctx.noteContent.length)})`,
+        label: `笔记：${baseName(ctx.notePath)}（${formatAttachmentSize(ctx.noteContent.length)}）`,
         body: ctx.noteContent
       });
     }
     if (ctx.selection && ctx.selection.trim()) {
       chips.push({
-        label: `selection: ${baseName(ctx.notePath)} (${formatAttachmentSize(ctx.selection.length)})`,
+        label: `选中内容：${baseName(ctx.notePath)}（${formatAttachmentSize(ctx.selection.length)}）`,
         body: ctx.selection
       });
     }
@@ -737,11 +750,11 @@ export class HermesView extends ItemView {
     // dependency on a lucide icon name resolving) so the toggle affordance
     // is always visible, and the arrow direction makes the current
     // collapsed/expanded state unambiguous at a glance.
-    const reasoningTitleEl = reasoningEl.createDiv({ cls: "hermes-reasoning-title", text: "▸ thinking" });
+    const reasoningTitleEl = reasoningEl.createDiv({ cls: "hermes-reasoning-title", text: "▸ 思考过程" });
     const reasoningBodyEl = reasoningEl.createDiv({ cls: "hermes-reasoning-body" });
     reasoningTitleEl.addEventListener("click", () => {
       const expanded = reasoningEl.classList.toggle("is-expanded");
-      reasoningTitleEl.setText(expanded ? "▾ thinking" : "▸ thinking");
+      reasoningTitleEl.setText(expanded ? "▾ 思考过程" : "▸ 思考过程");
     });
 
     const toolsEl = msg.createDiv({ cls: "hermes-tools" });
@@ -824,7 +837,7 @@ export class HermesView extends ItemView {
       const before = this.tabs.length;
       this.newTab();
       if (this.tabs.length === before) {
-        new Notice("Hermes: close a tab first (tab limit reached).");
+        new Notice("Hermes：请先关闭一个标签页（已达到数量上限）。");
         return;
       }
       tab = this.activeTab();
@@ -893,13 +906,13 @@ class HistoryModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("hermes-history-modal");
-    contentEl.createEl("h3", { text: "Chat history" });
+    contentEl.createEl("h3", { text: "聊天记录" });
 
     const list = this.view.getConversations();
     const listEl = contentEl.createDiv({ cls: "hermes-history-list" });
     const emptyEl = contentEl.createDiv({
       cls: "hermes-history-empty",
-      text: "No saved conversations yet."
+      text: "还没有保存的对话。"
     });
 
     const render = (): void => {
@@ -915,13 +928,13 @@ class HistoryModal extends Modal {
         if (preview) main.createDiv({ cls: "hermes-history-preview", text: preview });
         main.createDiv({
           cls: "hermes-history-meta",
-          text: `${relativeTime(now, conv.updatedAt)} - ${conv.messages.length} messages`
+          text: `${relativeTime(now, conv.updatedAt)} · ${conv.messages.length} 条消息`
         });
         main.onclick = () => {
           this.view.restoreConversation(conv.id);
           this.close();
         };
-        const del = row.createSpan({ cls: "hermes-history-del", attr: { "aria-label": "Delete" } });
+        const del = row.createSpan({ cls: "hermes-history-del", attr: { "aria-label": "删除" } });
         setIcon(del, "trash");
         del.onclick = async (e) => {
           e.stopPropagation();

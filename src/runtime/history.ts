@@ -54,7 +54,7 @@ export function deriveTitle(messages: StoredMessage[]): string {
   const raw = displayText(firstUser ?? { role: "user", content: "" })
     .replace(/\s+/g, " ")
     .trim();
-  if (!raw) return "New chat";
+  if (!raw) return "新对话";
   return raw.length > 60 ? raw.slice(0, 57) + "..." : raw;
 }
 
@@ -70,16 +70,16 @@ export function lastMessagePreview(messages: StoredMessage[], max = 80): string 
   const visible = messages.filter((m) => m.role !== "system" && displayText(m).trim());
   if (visible.length < 2) return "";
   const last = visible[visible.length - 1];
-  const who = last.role === "user" ? "You" : "Hermes";
+  const who = last.role === "user" ? "你" : "Hermes";
   const raw = displayText(last).replace(/\s+/g, " ").trim();
   const body = raw.length > max ? raw.slice(0, max - 3) + "..." : raw;
-  return `${who}: ${body}`;
+  return `${who}：${body}`;
 }
 
 /** A compact label for a chat tab (ASCII-only ellipsis per project rules). */
 export function tabLabel(title: string): string {
   const t = (title || "").trim();
-  if (!t) return "Chat";
+  if (!t) return "聊天";
   return t.length > 20 ? t.slice(0, 18) + "..." : t;
 }
 
@@ -103,18 +103,18 @@ export function removeConversation(list: Conversation[], id: string): Conversati
 /** Human-friendly age label given the current time (both epoch ms). */
 export function relativeTime(nowMs: number, thenMs: number): string {
   const s = Math.max(0, Math.floor((nowMs - thenMs) / 1000));
-  if (s < 45) return "just now";
+  if (s < 45) return "刚刚";
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${m} 分钟前`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${h} 小时前`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
+  if (d < 7) return `${d} 天前`;
   const w = Math.floor(d / 7);
-  if (w < 5) return `${w}w ago`;
+  if (w < 5) return `${w} 周前`;
   const mo = Math.floor(d / 30);
-  if (mo < 12) return `${mo}mo ago`;
-  return `${Math.floor(d / 365)}y ago`;
+  if (mo < 12) return `${mo} 个月前`;
+  return `${Math.floor(d / 365)} 年前`;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

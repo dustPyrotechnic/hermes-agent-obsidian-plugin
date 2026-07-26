@@ -225,14 +225,13 @@ export class HermesGatewayClient {
       if (caps === null && models.length === 0) {
         return {
           ok: false,
-          detail:
-            "Reached the host but got no capabilities/models. Is the Hermes gateway started and the API key correct?"
+          detail: "已连上主机，但没有返回 capabilities/models。请确认 Hermes 网关已启动，且 API 密钥正确。"
         };
       }
       return {
         ok: true,
-        detail: `Connected. Transport: ${useRuns ? "runs" : "chat"}.${
-          models.length ? ` ${models.length} model(s) available.` : ""
+        detail: `连接成功。传输方式：${useRuns ? "runs" : "chat"}。${
+          models.length ? ` 可用模型 ${models.length} 个。` : ""
         }`,
         transport: useRuns ? "runs" : "chat",
         models
@@ -242,13 +241,13 @@ export class HermesGatewayClient {
       if (/ECONNREFUSED|timed out|ENOTFOUND|EHOSTUNREACH/i.test(msg)) {
         return {
           ok: false,
-          detail: `Cannot reach the gateway at ${this.base()}. Start the Hermes gateway, then retry: launch Hermes Desktop, or (CLI/TUI install) run \`hermes gateway\`. (${msg})`
+          detail: `无法连接到 ${this.base()} 上的网关。请先启动 Hermes 网关再重试：启动 Hermes Desktop，或（CLI/TUI 安装）运行 \`hermes gateway\`。（${msg}）`
         };
       }
       if (/401|403/.test(msg)) {
-        return { ok: false, detail: `Authentication failed. Check the API key. (${msg})` };
+        return { ok: false, detail: `鉴权失败，请检查 API 密钥。（${msg}）` };
       }
-      return { ok: false, detail: `Connection failed: ${msg}` };
+      return { ok: false, detail: `连接失败：${msg}` };
     }
   }
 
@@ -445,7 +444,7 @@ export class HermesGatewayClient {
     });
     req.on("timeout", () => {
       req.destroy();
-      if (!isAborted()) finish("Request timed out.");
+      if (!isAborted()) finish("请求超时。");
     });
     req.write(payload);
     req.end();
@@ -541,7 +540,7 @@ export class HermesGatewayClient {
           fallback();
           return;
         }
-        finish(typeof raw.error === "string" && raw.error ? raw.error : "Hermes run failed.");
+        finish(typeof raw.error === "string" && raw.error ? raw.error : "Hermes 运行失败。");
         return;
       }
       if (name === "run.cancelled") {
@@ -620,7 +619,7 @@ export class HermesGatewayClient {
       eventsReq.on("timeout", () => {
         eventsReq.destroy();
         if (!hasContent) fallback();
-        else finish("Run event stream timed out.");
+        else finish("事件流超时。");
       });
       eventsReq.end();
     };

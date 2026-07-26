@@ -3,7 +3,7 @@
   "name": "Hermes Agent",
   "version": "0.9.1",
   "minAppVersion": "1.7.2",
-  "description": "Chat with a locally installed Hermes Agent (Desktop or CLI/TUI) from your vault. Send the current note or selection to the local Hermes gateway and stream replies in a sidebar, with agent file tools and saved chat history.",
+  "description": "在库内与本地安装的 Hermes Agent（Desktop 或 CLI/TUI）聊天。把当前笔记或选中内容发给本地 Hermes 网关，在侧边栏流式接收回复，支持 Agent 文件工具与聊天记录保存。",
   "author": "Jason",
   "authorUrl": "https://github.com/jsun2020",
   "isDesktopOnly": true

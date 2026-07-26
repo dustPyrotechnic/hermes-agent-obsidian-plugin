@@ -97,7 +97,7 @@ export class HermesGraphView extends ItemView {
     return VIEW_TYPE_HERMES_GRAPH;
   }
   getDisplayText(): string {
-    return "Hermes Smart Graph";
+    return "Hermes 知识图谱";
   }
   getIcon(): string {
     return "git-fork";
@@ -113,10 +113,10 @@ export class HermesGraphView extends ItemView {
     this.analyzeBtn = this.toolbarEl.createEl("button", { cls: "hermes-graph-btn mod-cta" });
     const analyzeIcon = this.analyzeBtn.createSpan({ cls: "hermes-graph-btn-icon" });
     setIcon(analyzeIcon, "git-fork");
-    this.analyzeBtn.createSpan({ text: "Analyze vault" });
+    this.analyzeBtn.createSpan({ text: "分析当前库" });
     this.analyzeBtn.onclick = () => void this.analyze();
 
-    const fitBtn = this.toolbarEl.createEl("button", { cls: "hermes-graph-btn", attr: { "aria-label": "Fit to view" } });
+    const fitBtn = this.toolbarEl.createEl("button", { cls: "hermes-graph-btn", attr: { "aria-label": "适应窗口" } });
     setIcon(fitBtn, "maximize");
     fitBtn.onclick = () => {
       this.fitToView();
@@ -130,14 +130,14 @@ export class HermesGraphView extends ItemView {
     this.canvas = this.canvasWrapEl.createEl("canvas", { cls: "hermes-graph-canvas" });
     const ctx = this.canvas.getContext("2d");
     if (!ctx) {
-      this.canvasWrapEl.createDiv({ cls: "hermes-graph-empty", text: "Canvas not available." });
+      this.canvasWrapEl.createDiv({ cls: "hermes-graph-empty", text: "画布不可用。" });
       return;
     }
     this.ctx = ctx;
 
     this.emptyEl = this.canvasWrapEl.createDiv({ cls: "hermes-graph-empty" });
     this.emptyEl.createSpan({
-      text: 'No graph yet. Click "Analyze vault" to let Hermes map your notes.'
+      text: '还没有图谱。点击"分析当前库"，让 Hermes 帮你梳理笔记之间的关系。'
     });
 
     this.registerInteraction();
@@ -150,8 +150,8 @@ export class HermesGraphView extends ItemView {
     if (cached && cached.nodes.length) {
       this.setGraph(cached);
       this.setStatus(
-        `${cached.nodes.length} notes, ${cached.edges.length} links${
-          cached.generatedAt ? ` · cached ${new Date(cached.generatedAt).toLocaleString()}` : ""
+        `${cached.nodes.length} 篇笔记，${cached.edges.length} 条关联${
+          cached.generatedAt ? ` · 缓存于 ${new Date(cached.generatedAt).toLocaleString()}` : ""
         }`
       );
     } else {
@@ -176,12 +176,12 @@ export class HermesGraphView extends ItemView {
     if (this.analyzing) return;
     const notes = await this.gatherNotes();
     if (notes.length === 0) {
-      new Notice("Hermes: no markdown notes found to analyze.");
+      new Notice("Hermes：库里没有可分析的 Markdown 笔记。");
       return;
     }
     this.analyzing = true;
     this.analyzeBtn.disabled = true;
-    this.setStatus(`Analyzing ${notes.length} notes with Hermes…`);
+    this.setStatus(`正在用 Hermes 分析 ${notes.length} 篇笔记…`);
 
     const prompt = buildAnalysisPrompt(notes);
     const call = this.plugin.client.runToCompletion(prompt);
@@ -190,8 +190,8 @@ export class HermesGraphView extends ItemView {
       const reply = await call.result;
       const parsed = extractJson(reply);
       if (!parsed) {
-        this.setStatus("Hermes did not return graph JSON. Try again, or lower 'Max notes'.");
-        new Notice("Hermes: could not parse a graph from the reply.");
+        this.setStatus("Hermes 没有返回可用的图谱数据，请重试，或调低设置里的「最大分析笔记数」。");
+        new Notice("Hermes：无法从回复中解析出图谱。");
         return;
       }
       const graph = buildSmartGraph(notes, parsed, {
@@ -202,11 +202,11 @@ export class HermesGraphView extends ItemView {
       this.setGraph(graph);
       await this.plugin.saveGraphCache(graph);
       const semantic = graph.edges.filter((e) => e.kind === "semantic").length;
-      this.setStatus(`${graph.nodes.length} notes · ${semantic} semantic · ${graph.edges.length - semantic} wikilink`);
+      this.setStatus(`${graph.nodes.length} 篇笔记 · ${semantic} 条语义关联 · ${graph.edges.length - semantic} 条 wikilink`);
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
-      this.setStatus(`Analysis failed: ${msg}`);
-      new Notice(`Hermes graph: ${msg}`);
+      this.setStatus(`分析失败：${msg}`);
+      new Notice(`Hermes 图谱：${msg}`);
     } finally {
       this.analyzing = false;
       this.analyzeBtn.disabled = false;
